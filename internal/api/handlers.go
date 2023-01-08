@@ -124,7 +124,7 @@ func (app *application) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (app *application) EventCatalog(w http.ResponseWriter, r *http.Request) {
+func (app *application) ManageEvents(w http.ResponseWriter, r *http.Request) {
 	events, err := app.DB.AllEvents()
 	if err != nil {
 		app.errorJSON(w, err)

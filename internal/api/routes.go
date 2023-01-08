@@ -18,11 +18,12 @@ func (app *application) routes() http.Handler {
 	mux.Get("/refresh", app.refreshToken)
 	mux.Get("/logout", app.logout)
 
+	mux.Get("/events", app.AllEvents)
+
 	mux.Route("/admin", func(mux chi.Router) {
 		mux.Use(app.authRequired)
 
-		mux.Get("/events", app.AllEvents)
-		mux.Get("/catalogue", app.EventCatalog)
+		mux.Get("/manage-events", app.ManageEvents)
 	})
 
 	return mux

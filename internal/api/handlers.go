@@ -1,10 +1,18 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
+	"github.com/Lateralus-lab/ts-backend/internal/models"
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt"
 )
 
@@ -132,4 +140,134 @@ func (app *application) ManageEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = app.writeJSON(w, http.StatusOK, events)
+}
+
+func (app *application) GetEvent(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	eventID, err := strconv.Atoi(id)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	event, err := app.DB.OneEvent(eventID)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, event)
+}
+
+func (app *application) EventForEdit(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	eventID, err := strconv.Atoi(id)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	event, genres, err := app.DB.OneEventForEdit(eventID)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	var payload = struct {
+		Event  *models.Event   `json:"event"`
+		Genres []*models.Genre `json:"genres"`
+	}{
+		event,
+		genres,
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, payload)
+}
+
+func (app *application) AllGenres(w http.ResponseWriter, r *http.Request) {
+	genres, err := app.DB.AllGenres()
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	_ = app.writeJSON(w, http.StatusOK, genres)
+}
+
+func (app *application) InsertEvent(w http.ResponseWriter, r *http.Request) {
+	var event models.Event
+
+	err := app.readJSON(w, r, &event)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	event = app.getPoster(event)
+
+	event.CreatedAt = time.Now()
+	event.UpdatedAt = time.Now()
+
+	newID, err := app.DB.InsertEvent(event)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	err = app.DB.UpdateEventGenres(newID, event.GenresArray)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+
+	resp := JSONResponse{
+		Error:   false,
+		Message: "Event successfully updated",
+	}
+
+	app.writeJSON(w, http.StatusAccepted, resp)
+}
+
+func (app *application) getPoster(event models.Event) models.Event {
+	type TheEventDB struct {
+		Page    int `json:"page"`
+		Results []struct {
+			PosterPath string `json:"poster_path"`
+		} `json:"results"`
+		TotalPages int `json:"total_pages"`
+	}
+
+	client := &http.Client{}
+	theUrl := fmt.Sprintf("https://api.themoviedb.org/3/search/movie?api_key=%s", app.APIKey)
+
+	req, err := http.NewRequest("GET", theUrl+"$query="+url.QueryEscape(event.Title), nil)
+	if err != nil {
+		log.Panicln(err)
+		return event
+	}
+
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Panicln(err)
+		return event
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Panicln(err)
+		return event
+	}
+
+	var responseObject TheEventDB
+
+	json.Unmarshal(bodyBytes, &responseObject)
+	if len(responseObject.Results) > 0 {
+		event.Image = responseObject.Results[0].PosterPath
+	}
+
+	return event
 }

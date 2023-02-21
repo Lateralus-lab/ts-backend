@@ -19,11 +19,15 @@ func (app *application) routes() http.Handler {
 	mux.Get("/logout", app.logout)
 
 	mux.Get("/events", app.AllEvents)
+	mux.Get("/events/{id}", app.GetEvent)
+
+	mux.Get("/genres", app.AllGenres)
 
 	mux.Route("/admin", func(mux chi.Router) {
 		mux.Use(app.authRequired)
 
-		mux.Get("/manage-events", app.ManageEvents)
+		mux.Get("/events", app.ManageEvents)
+		mux.Get("/manage-events/{id}", app.EventForEdit)
 	})
 
 	return mux

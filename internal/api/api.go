@@ -22,6 +22,7 @@ type application struct {
 	JWTIssuer    string
 	JWTAudience  string
 	CookieDomain string
+	APIKey       string
 }
 
 func Start() {
@@ -33,6 +34,7 @@ func Start() {
 	flag.StringVar(&app.JWTAudience, "jwt-audience", "example.com", "signing audience")
 	flag.StringVar(&app.CookieDomain, "cookie-domain", "localhost", "cookie domain")
 	flag.StringVar(&app.Domain, "domain", "example.com", "domain")
+	flag.StringVar(&app.APIKey, "api-key", "cdadf36d6c0a3d613890004f976dac69", "api key")
 	flag.Parse()
 
 	conn, err := app.connectToDB()
@@ -47,12 +49,14 @@ func Start() {
 		Issuer:        app.JWTIssuer,
 		Audience:      app.JWTAudience,
 		Secret:        app.JWTSecret,
-		TokenExpiry:   time.Minute * 15,
+		TokenExpiry:   time.Second * 5,
 		RefreshExpiry: time.Hour * 24,
 		CookiePath:    "/",
 		CookieName:    "refresh_token",
 		CookieDomain:  app.CookieDomain,
 	}
+
+	// TokenExpiry:   time.Minute * 15,
 
 	log.Println("Starting server on port", PORT)
 	err = http.ListenAndServe(fmt.Sprintf(":%d", PORT), app.routes())
